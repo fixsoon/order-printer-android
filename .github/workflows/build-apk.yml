@@ -30,6 +30,7 @@ jobs:
             ccache \
             cmake \
             gettext \
+            autopoint \
             libffi-dev \
             libltdl-dev \
             libssl-dev \
