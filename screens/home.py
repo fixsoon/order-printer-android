@@ -8,8 +8,6 @@ from kivymd.uix.textfield import MDTextField
 from kivymd.uix.scrollview import MDScrollView
 from kivymd.uix.card import MDCard
 from kivymd.uix.dialog import MDDialog
-from kivymd.uix.selectioncontrol import MDCheckbox
-from kivymd.uix.datatables import MDDataTable
 from kivy.metrics import dp
 from kivy.clock import Clock
 import threading

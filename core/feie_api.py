@@ -4,7 +4,7 @@ import time
 import hashlib
 import requests
 import json
-from config import FEIE_USER, FEIE_UKEY, FEIE_API_URL
+from core.config import FEIE_USER, FEIE_UKEY, FEIE_API_URL
 
 
 def _sign(user, ukey, stime):
