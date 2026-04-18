@@ -29,6 +29,7 @@ jobs:
             build-essential \
             ccache \
             cmake \
+            gettext \
             libffi-dev \
             libltdl-dev \
             libssl-dev \
