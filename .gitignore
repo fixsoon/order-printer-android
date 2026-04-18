@@ -1,0 +1,24 @@
+# Build outputs
+bin/
+.buildozer/
+*.apk
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Logs
+.buildozer/logs/
