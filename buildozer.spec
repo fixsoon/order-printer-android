@@ -1,26 +1,24 @@
 [app]
 
-title = 飞鹅餐饮订单打印
+title = 标签打印Hermes
 package.name = orderprinter
 package.domain = com.feie.orderprinter
 source.dir = .
-source.include_exts = py,png,jpg,kv,atlas,json,db
+source.include_exts = py,png,jpg,kv,atlas,json,db,ttf,ttc
+source.exclude_dirs = .venv, .git, .github, bin, __pycache__, buildozer, .buildozer
 version = 1.0.0
 
-requirements = python3,kivy==2.3.0,kivymd==1.1.1,openpyxl,pandas,requests,plyer,pillow,numpy,sqlite3
+requirements = python3,kivy==2.1.0,openpyxl,et_xmlfile,pandas,requests,plyer,pillow,numpy,chardet
 
 orientation = portrait
 fullscreen = 0
 
-android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,MANAGE_EXTERNAL_STORAGE
+android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE
 android.api = 33
 android.minapi = 21
 android.accept_sdk_license = True
 
-# 构建方式
-# p4a.source_dir = 
-# p4a.fork = 
-# p4a.branch = 
+android.env_vars = KIVY_GL_BACKEND=sdl2,KIVY_WINDOW=sdl2
 
 [buildozer]
 log_level = 2

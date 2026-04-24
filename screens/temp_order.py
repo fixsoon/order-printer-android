@@ -1,139 +1,144 @@
-"""临时加单页面"""
+"""临时加单（纯 Kivy）"""
 
-from kivymd.uix.screen import MDScreen
-from kivymd.uix.boxlayout import MDBoxLayout
-from kivymd.uix.button import MDRaisedButton, MDFlatButton
-from kivymd.uix.label import MDLabel
-from kivymd.uix.textfield import MDTextField
-from kivymd.uix.dialog import MDDialog
-from kivy.metrics import dp
-from datetime import datetime
-import re
-
-from core.storage import get_default_printer, is_cup_product
-from core.feie_api import print_html as feie_print
-from core.templates import receipt_html, cup_label_html
+from kivy.uix.screenmanager import Screen
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.button import Button
+from kivy.uix.label import Label
+from kivy.uix.textinput import TextInput
+from kivy.uix.popup import Popup
+import threading
 
 
-class TempOrderScreen(MDScreen):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._build_ui()
+class TempOrderScreen(Screen):
+    def on_enter(self):
+        if not hasattr(self, 'chain_input'):
+            self._build_ui()
 
     def _build_ui(self):
-        layout = MDBoxLayout(orientation="vertical", spacing=dp(8), padding=dp(15))
+        from kivy.metrics import dp
+        root = BoxLayout(orientation='vertical', padding=dp(12), spacing=dp(8))
 
-        # 顶部
-        top = MDBoxLayout(size_hint_y=None, height=dp(48))
-        top.add_widget(MDFlatButton(
-            text="< 返回",
-            on_release=lambda x: setattr(self.manager, "current", "home"),
+        root.add_widget(Label(
+            text='[b]临时加单[/b]', markup=True, halign='center',
+            size_hint_y=None, height=dp(44), font_size=dp(18)
         ))
-        top.add_widget(MDLabel(text="临时加单", halign="center", font_style="H6"))
-        top.add_widget(MDLabel(size_hint_x=0.2))
-        layout.add_widget(top)
-
-        layout.add_widget(MDLabel(
-            text="填写订单信息后打印",
-            theme_text_color="Secondary",
-            halign="center",
-            size_hint_y=None,
-            height=dp(30),
+        root.add_widget(Label(
+            text='手动输入临时订单信息',
+            color=(0.5, 0.5, 0.5, 1), size_hint_y=None, height=dp(28), font_size=dp(12)
         ))
 
-        # 输入字段
-        self.fields = {}
-        field_defs = [
-            ("chain", "接龙号"),
-            ("school", "学校"),
-            ("grade", "年段"),
-            ("class_name", "班级"),
-            ("student", "学生姓名"),
-            ("meal", "餐别"),
-            ("product", "商品名称"),
-            ("qty", "数量"),
-            ("price", "金额"),
-            ("note", "备注"),
+        form = BoxLayout(orientation='vertical', spacing=dp(10), size_hint_y=1)
+        fields = [
+            ('接龙号', 'chain_input'),
+            ('学校', 'school_input'),
+            ('学生姓名', 'student_input'),
+            ('商品名称', 'product_input'),
+            ('数量', 'qty_input'),
         ]
+        for label_text, attr_name in fields:
+            row = BoxLayout(size_hint_y=None, height=dp(44))
+            row.add_widget(Label(text=label_text + ':', size_hint_x=0.35, halign='left'))
+            inp = TextInput(size_hint_x=0.65, multiline=False)
+            if attr_name == 'qty_input':
+                inp.input_filter = 'int'
+                inp.text = '1'
+            setattr(self, attr_name, inp)
+            row.add_widget(inp)
+            form.add_widget(row)
 
-        for key, hint in field_defs:
-            field = MDTextField(hint_text=hint, mode="rectangle")
-            layout.add_widget(field)
-            self.fields[key] = field
+        self.temp_info = Label(text='', color=(0.4, 0.4, 0.4, 1), size_hint_y=None, height=dp(30))
+        form.add_widget(self.temp_info)
+        root.add_widget(form)
 
-        self.fields["qty"].text = "1"
-
-        # 打印按钮
-        btn_box = MDBoxLayout(size_hint_y=None, height=dp(50), spacing=dp(10))
-        btn_box.add_widget(MDRaisedButton(
-            text="打印收银小票",
-            on_release=lambda x: self._print_receipt(),
-            md_bg_color=(0.2, 0.6, 0.8, 1),
-            size_hint_x=0.5,
+        bottom = BoxLayout(size_hint_y=None, height=dp(46), spacing=dp(8))
+        bottom.add_widget(Button(
+            text='← 返回', background_color=(0.4, 0.4, 0.4, 1),
+            on_release=lambda x: setattr(self.manager, 'current', 'home')
         ))
-        btn_box.add_widget(MDRaisedButton(
-            text="打印杯贴",
-            on_release=lambda x: self._print_cup(),
-            md_bg_color=(0.9, 0.5, 0.2, 1),
-            size_hint_x=0.5,
+        bottom.add_widget(Button(
+            text='打印杯贴', background_color=(0.9, 0.5, 0.2, 1),
+            on_release=lambda x: self._print_cup()
         ))
-        layout.add_widget(btn_box)
+        bottom.add_widget(Button(
+            text='打印小票', background_color=(0.2, 0.6, 0.8, 1),
+            on_release=lambda x: self._print_receipt()
+        ))
+        root.add_widget(bottom)
+        self.add_widget(root)
 
-        self.add_widget(layout)
+    def _show_toast(self, text):
+        from kivy.clock import Clock
+        popup = Popup(
+            title='提示', content=Label(text=text),
+            size_hint=(0.8, None), height=dp(120),
+            auto_dismiss=True
+        )
+        popup.open()
+        Clock.schedule_once(lambda dt: popup.dismiss(), 3)
 
-    def _build_order(self):
-        f = self.fields
+    def _get_fields(self):
         return {
-            "chain": f["chain"].text.strip() or "临时单",
-            "school": f["school"].text.strip(),
-            "grade": f["grade"].text.strip(),
-            "class_name": f["class_name"].text.strip(),
-            "student": f["student"].text.strip(),
-            "meal": f["meal"].text.strip(),
-            "user_note": f["note"].text.strip(),
-            "admin_note": "",
-            "time": datetime.now(),
-            "items": [{
-                "name": f["product"].text.strip(),
-                "qty": int(f["qty"].text or 1),
-                "price": float(f["price"].text or 0),
-            }],
-            "total": float(f["price"].text or 0) * int(f["qty"].text or 1),
+            'chain': self.chain_input.text.strip(),
+            'school': self.school_input.text.strip(),
+            'student': self.student_input.text.strip(),
+            'product_name': self.product_input.text.strip(),
+            'qty': int(self.qty_input.text.strip() or '1'),
         }
 
-    def _print_receipt(self):
-        printer = get_default_printer("receipt")
-        if not printer:
-            self._msg("请先设置收银小票打印机")
-            return
-        try:
-            html = receipt_html(self._build_order())
-            feie_print(printer["sn"], html, printer.get("key", ""))
-            self._msg("收银小票已发送打印 ✓")
-        except Exception as e:
-            self._msg(f"打印失败: {e}")
-
     def _print_cup(self):
-        product = self.fields["product"].text.strip()
-        if not is_cup_product(product):
-            self._msg(f"「{product}」不在杯贴商品库中，请先添加")
-            return
-        printer = get_default_printer("cup")
+        from core.storage import get_default_printer
+        from core.feie_api import print_html as feie_print
+        from core.templates import cup_label_html
+        printer = get_default_printer('cup')
         if not printer:
-            self._msg("请先设置杯贴打印机")
+            self._show_toast('请先设置杯贴打印机')
             return
-        try:
-            order = self._build_order()
-            html = cup_label_html(order, product)
-            feie_print(printer["sn"], html, printer.get("key", ""))
-            self._msg("杯贴已发送打印 ✓")
-        except Exception as e:
-            self._msg(f"打印失败: {e}")
+        fields = self._get_fields()
+        if not fields['product_name']:
+            self._show_toast('请输入商品名称')
+            return
+        self.temp_info.text = '正在打印...'
 
-    def _msg(self, text):
-        dialog = MDDialog(
-            title="提示",
-            text=text,
-            buttons=[MDFlatButton(text="确定", on_release=lambda x: dialog.dismiss())],
-        )
-        dialog.open()
+        def do():
+            try:
+                html = cup_label_html(fields, fields['product_name'])
+                feie_print(printer['sn'], html, printer.get('key', ''))
+                from kivy.clock import Clock
+                Clock.schedule_once(lambda dt: self._show_toast('杯贴打印成功'))
+            except Exception as e:
+                from kivy.clock import Clock
+                Clock.schedule_once(lambda dt: self._show_toast(f'打印失败: {e}'))
+
+        threading.Thread(target=do, daemon=True).start()
+
+    def _print_receipt(self):
+        from core.storage import get_default_printer
+        from core.feie_api import print_html as feie_print
+        from core.templates import receipt_html
+        printer = get_default_printer('receipt')
+        if not printer:
+            self._show_toast('请先设置收银小票打印机')
+            return
+        fields = self._get_fields()
+        if not fields['student'] or not fields['product_name']:
+            self._show_toast('请输入姓名和商品')
+            return
+        self.temp_info.text = '正在打印...'
+
+        def do():
+            try:
+                item = {'orders': [{'chain': fields['chain'], 'school': fields['school'],
+                                   'student': fields['student'],
+                                   'total': 0,
+                                   'items': [{'name': fields['product_name'],
+                                              'qty': fields['qty'], 'price': 0}]}],
+                        'total': 0}
+                html = receipt_html(item)
+                feie_print(printer['sn'], html, printer.get('key', ''))
+                from kivy.clock import Clock
+                Clock.schedule_once(lambda dt: self._show_toast('小票打印成功'))
+            except Exception as e:
+                from kivy.clock import Clock
+                Clock.schedule_once(lambda dt: self._show_toast(f'打印失败: {e}'))
+
+        threading.Thread(target=do, daemon=True).start()

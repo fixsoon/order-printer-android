@@ -1,98 +1,73 @@
-"""排版预览页面"""
+"""排版预览（纯 Kivy）"""
 
-from kivymd.uix.screen import MDScreen
-from kivymd.uix.boxlayout import MDBoxLayout
-from kivymd.uix.button import MDRaisedButton, MDFlatButton
-from kivymd.uix.label import MDLabel
-from kivymd.uix.scrollview import MDScrollView
-from kivymd.uix.card import MDCard
-from kivy.metrics import dp
-from datetime import datetime
-
+from kivy.uix.screenmanager import Screen
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.button import Button
+from kivy.uix.label import Label
+from kivy.uix.textinput import TextInput
+from kivy.graphics import Color, Rectangle
+from core.storage import get_default_printer, is_cup_product
 from core.templates import receipt_html, cup_label_html
 
 
-class PreviewScreen(MDScreen):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._build_ui()
+class PreviewScreen(Screen):
+    def on_enter(self):
+        if not hasattr(self, 'preview_label'):
+            self._build_ui()
+        self._refresh()
 
     def _build_ui(self):
-        layout = MDBoxLayout(orientation="vertical", spacing=dp(10), padding=dp(15))
+        from kivy.metrics import dp
+        root = BoxLayout(orientation='vertical', padding=dp(12), spacing=dp(8))
 
-        # 顶部
-        top = MDBoxLayout(size_hint_y=None, height=dp(48))
-        top.add_widget(MDFlatButton(
-            text="< 返回",
-            on_release=lambda x: setattr(self.manager, "current", "home"),
+        root.add_widget(Label(
+            text='[b]排版预览[/b]', markup=True, halign='center',
+            size_hint_y=None, height=dp(44), font_size=dp(18)
         ))
-        top.add_widget(MDLabel(text="排版预览", halign="center", font_style="H6"))
-        top.add_widget(MDLabel(size_hint_x=0.2))
-        layout.add_widget(top)
 
-        # 切换按钮
-        tab_box = MDBoxLayout(size_hint_y=None, height=dp(48), spacing=dp(10))
-        tab_box.add_widget(MDRaisedButton(
-            text="收银小票",
-            on_release=lambda x: self._show_receipt(),
-        ))
-        tab_box.add_widget(MDRaisedButton(
-            text="杯贴",
-            on_release=lambda x: self._show_cup(),
-        ))
-        layout.add_widget(tab_box)
-
-        # 预览内容
-        scroll = MDScrollView()
-        self.preview_label = MDLabel(
-            text="",
-            halign="left",
-            font_style="Body2",
-            size_hint_y=None,
+        self.preview_label = Label(
+            text='请先在主页导入 Excel 文件\n然后返回此处查看预览',
+            halign='center', valign='middle', color=(0.5, 0.5, 0.5, 1)
         )
-        self.preview_label.bind(texture_height=self.preview_label.setter("height"))
-        scroll.add_widget(self.preview_label)
-        layout.add_widget(scroll)
+        root.add_widget(self.preview_label)
 
-        layout.add_widget(MDLabel(
-            text="提示：修改 core/templates.py 中的模板函数可自定义排版",
-            theme_text_color="Secondary",
-            font_style="Caption",
-            halign="center",
-            size_hint_y=None,
-            height=dp(30),
+        info_box = BoxLayout(size_hint_y=None, height=dp(36), spacing=dp(8))
+        info_box.add_widget(Button(
+            text='← 返回主页', background_color=(0.4, 0.4, 0.4, 1),
+            on_release=lambda x: setattr(self.manager, 'current', 'home')
         ))
+        info_box.add_widget(Button(
+            text='刷新预览', background_color=(0.3, 0.7, 0.3, 1),
+            on_release=lambda x: self._refresh()
+        ))
+        root.add_widget(info_box)
+        self.add_widget(root)
 
-        self.add_widget(layout)
-        self._show_receipt()
-
-    def _show_receipt(self):
-        sample = {
-            "chain": "接龙号 #001",
-            "school": "音西一中",
-            "grade": "七年级",
-            "class_name": "3班",
-            "student": "张三",
-            "meal": "午餐",
-            "user_note": "不要辣",
-            "admin_note": "请于12点前送到",
-            "time": datetime.now(),
-            "items": [
-                {"name": "红烧排骨饭", "qty": 1, "price": 18},
-                {"name": "珍珠奶茶", "qty": 2, "price": 12},
-            ],
-            "total": 42,
-        }
-        self.preview_label.text = receipt_html(sample)
-
-    def _show_cup(self):
-        sample = {
-            "chain": "接龙号 #001",
-            "school": "音西一中",
-            "grade": "七年级",
-            "class_name": "3班",
-            "student": "张三",
-            "user_note": "少冰",
-            "time": datetime.now(),
-        }
-        self.preview_label.text = cup_label_html(sample, "珍珠奶茶", "温/半糖/大杯")
+    def _refresh(self):
+        from kivy.uix.screenmanager import ScreenManager
+        home = None
+        for screen in self.manager.screens:
+            if screen.name == 'home':
+                home = screen
+                break
+        if home and home.df is not None and len(home.df) > 0:
+            df = home.df
+            sample = df.iloc[0]
+            printer = get_default_printer('receipt')
+            if printer:
+                try:
+                    item = {'orders': [{'chain': sample.get('接龙号', ''), 'school': sample.get('学校', ''),
+                                       'student': sample.get('学生姓名', ''),
+                                       'total': sample.get('商品金额', 0),
+                                       'items': [{'name': sample.get('商品名称', ''), 'qty': sample.get('数量', 1),
+                                                  'price': sample.get('商品金额', 0)}]}],
+                            'total': sample.get('商品金额', 0)}
+                    html = receipt_html(item)
+                    self.preview_label.text = f'[模拟收银小票预览]\n接龙号: {sample.get("接龙号","")}\n学生: {sample.get("学生姓名","")}\n商品: {sample.get("商品名称","")}\n\n完整 HTML 已生成，共 {len(html)} 字符'
+                    self.preview_label.markup = True
+                except Exception as e:
+                    self.preview_label.text = f'预览生成失败: {e}'
+            else:
+                self.preview_label.text = '请先在打印机设置中添加打印机'
+        else:
+            self.preview_label.text = '请先在主页导入 Excel 文件\n然后返回此处查看预览'

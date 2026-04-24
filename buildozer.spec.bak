@@ -1,0 +1,31 @@
+[app]
+
+title = OrderPrinter
+package.name = orderprinter
+package.domain = com.feie.orderprinter
+source.dir = .
+source.include_exts = py,png,jpg,kv,atlas,json,db
+source.exclude_dirs = .venv, .git, .github, bin, __pycache__, buildozer, .buildozer
+version = 1.0.0
+
+requirements = python3,kivy==2.0.0,kivymd==1.1.1,openpyxl,et_xmlfile,pandas,requests,plyer,pillow,numpy,chardet
+
+orientation = portrait
+fullscreen = 0
+
+android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,MANAGE_EXTERNAL_STORAGE
+android.api = 33
+android.minapi = 21
+android.accept_sdk_license = True
+
+# 强制 Kivy 使用 SDL2 + 禁用所有 GL 优化，避免 Adreno GPU 崩溃
+android.env_vars = KIVY_GL_BACKEND=sdl2,KIVY_WINDOW=sdl2,KIVY_GRAPHICS=GL_20
+
+# 构建方式
+# p4a.source_dir = 
+# p4a.fork = 
+# p4a.branch = 
+
+[buildozer]
+log_level = 2
+warn_on_root = 1

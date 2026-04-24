@@ -1,6 +1,7 @@
 """HTML 打印模板生成"""
 
-from datetime import datetime
+from datetime import datetime, timedelta
+from core.config import LABEL_WIDTH_PX, LABEL_HEIGHT_PX
 
 
 def receipt_html(order):
@@ -162,6 +163,192 @@ def summary_html(title, rows, extra_lines=None):
             {rows_html}
         </table>
         {extra_html}
+    </body>
+    </html>"""
+    return html
+
+
+# ===== 期效标签模板 =====
+
+def ingredient_label_html(name, storage_type, make_time, valid_hours):
+    """
+    食材期效标签 HTML（40x30mm）
+    name: 品名
+    storage_type: 储存温度（常温/冷冻/冷藏）
+    make_time: 制作时间（datetime）
+    valid_hours: 有效时长（小时）
+    """
+    if isinstance(make_time, datetime):
+        make_str = make_time.strftime("%m-%d %H:%M")
+        expire_time = make_time + timedelta(hours=valid_hours)
+        expire_str = expire_time.strftime("%m-%d %H:%M")
+    else:
+        make_str = str(make_time)
+        expire_str = ""
+
+    # 储存温度颜色
+    color_map = {"常温": "#E67E22", "冷冻": "#3498DB", "冷藏": "#2ECC71"}
+    color = color_map.get(storage_type, "#333")
+
+    html = f"""
+    <html>
+    <head>
+    <meta charset="utf-8">
+    <style>
+    body {{
+        width: {LABEL_WIDTH_PX}px;
+        height: {LABEL_HEIGHT_PX}px;
+        margin: 0;
+        padding: 0;
+        font-family: sans-serif;
+        box-sizing: border-box;
+        overflow: hidden;
+    }}
+    .container {{
+        width: {LABEL_WIDTH_PX}px;
+        height: {LABEL_HEIGHT_PX}px;
+        padding: 6px 8px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }}
+    .title {{
+        font-size: 18px;
+        font-weight: bold;
+        text-align: center;
+        margin-bottom: 2px;
+    }}
+    .info {{
+        font-size: 12px;
+        margin: 1px 0;
+    }}
+    .info-row {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }}
+    .temp-badge {{
+        display: inline-block;
+        background: {color};
+        color: white;
+        font-size: 12px;
+        font-weight: bold;
+        padding: 1px 6px;
+        border-radius: 3px;
+    }}
+    .divider {{
+        border-top: 1px dashed #666;
+        margin: 2px 0;
+    }}
+    .time-row {{
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        color: #555;
+    }}
+    </style>
+    </head>
+    <body>
+    <div class="container">
+        <div class="title">{name}</div>
+        <div class="divider"></div>
+        <div class="info-row">
+            <span>储存: <span class="temp-badge">{storage_type}</span></span>
+        </div>
+        <div class="info-row">
+            <span class="info">制作: {make_str}</span>
+        </div>
+        <div class="info-row">
+            <span class="info">有效至: {expire_str}</span>
+            <span class="info">({valid_hours}h)</span>
+        </div>
+    </div>
+    </body>
+    </html>"""
+    return html
+
+
+def food_sample_label_html(name, meal_type, sample_time, weight, operator):
+    """
+    食品留样标签 HTML（40x30mm）
+    name: 食品名称
+    meal_type: 餐别（早餐/午餐/晚餐）
+    sample_time: 留样时间（datetime）
+    weight: 留样重量（如 150g）
+    operator: 经手人
+    """
+    if isinstance(sample_time, datetime):
+        time_str = sample_time.strftime("%m-%d %H:%M")
+    else:
+        time_str = str(sample_time)
+
+    html = f"""
+    <html>
+    <head>
+    <meta charset="utf-8">
+    <style>
+    body {{
+        width: {LABEL_WIDTH_PX}px;
+        height: {LABEL_HEIGHT_PX}px;
+        margin: 0;
+        padding: 0;
+        font-family: sans-serif;
+        box-sizing: border-box;
+        overflow: hidden;
+    }}
+    .container {{
+        width: {LABEL_WIDTH_PX}px;
+        height: {LABEL_HEIGHT_PX}px;
+        padding: 6px 8px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }}
+    .header {{
+        font-size: 14px;
+        font-weight: bold;
+        text-align: center;
+        margin-bottom: 2px;
+    }}
+    .badge {{
+        display: inline-block;
+        background: #9B59B6;
+        color: white;
+        font-size: 12px;
+        font-weight: bold;
+        padding: 1px 6px;
+        border-radius: 3px;
+    }}
+    .divider {{
+        border-top: 1px dashed #666;
+        margin: 2px 0;
+    }}
+    .info {{
+        font-size: 12px;
+        margin: 1px 0;
+    }}
+    .info-row {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }}
+    </style>
+    </head>
+    <body>
+    <div class="container">
+        <div>
+            <span class="badge">{meal_type}</span>
+            <span class="header" style="margin-left:6px;">{name}</span>
+        </div>
+        <div class="divider"></div>
+        <div class="info-row">
+            <span class="info">留样: {time_str}</span>
+            <span class="info">{weight}</span>
+        </div>
+        <div class="info-row">
+            <span class="info">经手人: {operator}</span>
+        </div>
+    </div>
     </body>
     </html>"""
     return html

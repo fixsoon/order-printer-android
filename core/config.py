@@ -30,3 +30,24 @@ SCHOOL_PICKUP_MAP = {
 DEFAULT_TEMPERATURES = ["热", "温", "常温", "冰", "去冰"]
 DEFAULT_SWEETNESS = ["正常糖", "少糖", "半糖", "微糖", "不另外加糖"]
 DEFAULT_CUP_SIZES = ["大杯", "中杯", "小杯"]
+
+# 期效标签尺寸：40mm x 30mm（飞鹅标签打印机）
+LABEL_WIDTH_MM = 40
+LABEL_HEIGHT_MM = 30
+LABEL_DPI = 200  # 打印机 DPI
+# 换算为像素：40mm * 200 / 25.4 ≈ 315px, 30mm * 200 / 25.4 ≈ 236px
+LABEL_WIDTH_PX = int(LABEL_WIDTH_MM * LABEL_DPI / 25.4)
+LABEL_HEIGHT_PX = int(LABEL_HEIGHT_MM * LABEL_DPI / 25.4)
+
+# 储存温度选项
+STORAGE_TYPES = ["常温", "冷冻", "冷藏"]
+
+# 品类选项
+INGREDIENT_CATEGORIES = ["水果", "罐头", "小料", "原料", "酱料", "其他"]
+
+# 餐别选项
+MEAL_TYPES = ["早餐", "午餐", "晚餐"]
+
+# 标签打印机（期效标签用）
+DEFAULT_LABEL_SN = "570202889"
+DEFAULT_LABEL_KEY = "7bn46rwu"

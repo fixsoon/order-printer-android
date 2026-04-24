@@ -1,102 +1,99 @@
-"""杯贴商品库管理页面"""
+"""杯贴商品库（纯 Kivy）"""
 
-from kivymd.uix.screen import MDScreen
-from kivymd.uix.boxlayout import MDBoxLayout
-from kivymd.uix.button import MDRaisedButton, MDFlatButton
-from kivymd.uix.label import MDLabel
-from kivymd.uix.textfield import MDTextField
-from kivymd.uix.scrollview import MDScrollView
-from kivymd.uix.card import MDCard
-from kivy.metrics import dp
-
-from core.storage import add_cup_product, remove_cup_product, get_cup_products
+from kivy.uix.screenmanager import Screen
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.button import Button
+from kivy.uix.label import Label
+from kivy.uix.textinput import TextInput
+from kivy.uix.scrollview import ScrollView
+from kivy.uix.popup import Popup
+from core.storage import get_cup_products, add_cup_product, remove_cup_product
 
 
-class CupProductsScreen(MDScreen):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._build_ui()
+class CupProductsScreen(Screen):
+    def on_enter(self):
+        if not hasattr(self, 'list_layout'):
+            self._build_ui()
+        self._refresh()
 
     def _build_ui(self):
-        layout = MDBoxLayout(orientation="vertical", spacing=dp(10), padding=dp(15))
-
-        # 顶部
-        top = MDBoxLayout(size_hint_y=None, height=dp(48))
-        top.add_widget(MDFlatButton(
-            text="< 返回",
-            on_release=lambda x: setattr(self.manager, "current", "home"),
+        from kivy.metrics import dp
+        root = BoxLayout(orientation='vertical', padding=dp(12), spacing=dp(8))
+        root.add_widget(Label(
+            text='[b]杯贴商品库[/b]', markup=True, halign='center',
+            size_hint_y=None, height=dp(44), font_size=dp(18)
         ))
-        top.add_widget(MDLabel(text="杯贴商品库", halign="center", font_style="H6"))
-        top.add_widget(MDLabel(size_hint_x=0.2))
-        layout.add_widget(top)
-
-        layout.add_widget(MDLabel(
-            text="只有以下列表中的商品才会打印杯贴标签",
-            theme_text_color="Secondary",
-            font_style="Caption",
-            halign="center",
-            size_hint_y=None,
-            height=dp(30),
+        root.add_widget(Label(
+            text='设置哪些商品名会被打印为杯贴标签',
+            color=(0.5, 0.5, 0.5, 1), size_hint_y=None, height=dp(28), font_size=dp(12)
         ))
 
-        # 商品列表
-        scroll = MDScrollView()
-        self.product_box = MDBoxLayout(
-            orientation="vertical",
-            adaptive_height=True,
-            spacing=dp(5),
-        )
-        scroll.add_widget(self.product_box)
-        layout.add_widget(scroll)
+        self.list_container = ScrollView(size_hint_y=1)
+        self.list_layout = BoxLayout(orientation='vertical', size_hint_y=None, spacing=dp(8), padding=dp(4))
+        self.list_layout.bind(minimum_height=self.list_layout.setter('height'))
+        self.list_container.add_widget(self.list_layout)
+        root.add_widget(self.list_container)
 
-        # 添加区域
-        add_box = MDBoxLayout(size_hint_y=None, height=dp(50), spacing=dp(10))
-        self.name_field = MDTextField(hint_text="输入商品名称", mode="rectangle", size_hint_x=0.7)
-        add_box.add_widget(self.name_field)
-        add_box.add_widget(MDRaisedButton(
-            text="添加",
-            on_release=lambda x: self._add(),
-            size_hint_x=0.3,
+        bottom = BoxLayout(size_hint_y=None, height=dp(46), spacing=dp(8))
+        bottom.add_widget(Button(
+            text='← 返回', background_color=(0.4, 0.4, 0.4, 1),
+            on_release=lambda x: setattr(self.manager, 'current', 'home')
         ))
-        layout.add_widget(add_box)
+        bottom.add_widget(Button(
+            text='＋ 添加商品', background_color=(0.9, 0.5, 0.2, 1),
+            on_release=lambda x: self._show_add_popup()
+        ))
+        root.add_widget(bottom)
+        self.add_widget(root)
 
-        self.add_widget(layout)
-
-    def on_enter(self):
-        self._refresh_list()
-
-    def _refresh_list(self):
-        self.product_box.clear_widgets()
-        products = get_cup_products(enabled_only=False)
+    def _refresh(self):
+        from kivy.metrics import dp
+        if not hasattr(self, 'list_layout'):
+            return
+        self.list_layout.clear_widgets()
+        products = get_cup_products()
         if not products:
-            self.product_box.add_widget(MDLabel(
-                text="暂无商品，请添加需要打印杯贴的饮品名称",
-                halign="center",
-                theme_text_color="Hint",
-                size_hint_y=None,
-                height=dp(50),
+            self.list_layout.add_widget(Label(
+                text='暂无杯贴商品', color=(0.5, 0.5, 0.5, 1), size_hint_y=None, height=dp(60)
             ))
             return
-
         for p in products:
-            card = MDCard(padding=dp(10), size_hint_y=None, height=dp(55), elevation=1)
-            row = MDBoxLayout()
-            status = "✓" if p["enabled"] else "✗"
-            row.add_widget(MDLabel(text=f"{status} {p['name']}"))
-            row.add_widget(MDFlatButton(
-                text="删除",
-                on_release=lambda x, n=p["name"]: self._remove(n),
+            row = BoxLayout(size_hint_y=None, height=dp(48), padding=dp(8))
+            row.add_widget(Label(
+                text=p.get('name', ''), halign='left', valign='middle',
+                size_hint_x=0.7, font_size=dp(14)
             ))
-            card.add_widget(row)
-            self.product_box.add_widget(card)
+            row.add_widget(Button(
+                text='删除', size_hint_x=0.3, background_color=(0.9, 0.2, 0.2, 1),
+                on_release=lambda x, pid=p['id']: self._delete(pid)
+            ))
+            self.list_layout.add_widget(row)
 
-    def _add(self):
-        name = self.name_field.text.strip()
+    def _show_add_popup(self):
+        from kivy.metrics import dp
+        content = BoxLayout(orientation='vertical', padding=dp(16), spacing=dp(12))
+        self.product_input = TextInput(hint_text='商品名称关键字，如：奶茶', multiline=False, size_hint_y=None, height=dp(44))
+        content.add_widget(self.product_input)
+        hint_label = Label(
+            text='输入商品名关键字，包含该关键字的订单\n将自动打印为杯贴标签',
+            color=(0.4, 0.4, 0.4, 1), font_size=dp(12)
+        )
+        content.add_widget(hint_label)
+        btn_row = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(8))
+        btn_row.add_widget(Button(text='取消', on_release=lambda x, p=popup: p.dismiss()))
+        btn_row.add_widget(Button(text='添加', background_color=(0.9, 0.5, 0.2, 1),
+                                  on_release=lambda x, p=popup: self._add_product(p)))
+        content.add_widget(btn_row)
+        popup = Popup(title='添加杯贴商品', content=content, size_hint=(0.9, 0.5), auto_dismiss=False)
+        popup.open()
+
+    def _add_product(self, popup):
+        name = self.product_input.text.strip()
         if name:
             add_cup_product(name)
-            self.name_field.text = ""
-            self._refresh_list()
+        popup.dismiss()
+        self._refresh()
 
-    def _remove(self, name):
-        remove_cup_product(name)
-        self._refresh_list()
+    def _delete(self, pid):
+        remove_cup_product(pid)
+        self._refresh()

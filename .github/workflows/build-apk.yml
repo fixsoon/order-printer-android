@@ -53,9 +53,14 @@ jobs:
           buildozer android debug
         timeout-minutes: 60
 
+      - name: Set version output name
+        run: |
+          VERSION=$(grep "^version = " buildozer.spec | sed 's/version = //')
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: order-printer-apk
+          name: 标签打印Hermes-${{ env.VERSION }}
           path: bin/*.apk
           retention-days: 30

@@ -1,142 +1,138 @@
-"""打印机管理页面"""
+"""打印机设置（纯 Kivy）"""
 
-from kivymd.uix.screen import MDScreen
-from kivymd.uix.boxlayout import MDBoxLayout
-from kivymd.uix.button import MDRaisedButton, MDFlatButton
-from kivymd.uix.label import MDLabel
-from kivymd.uix.textfield import MDTextField
-from kivymd.uix.scrollview import MDScrollView
-from kivymd.uix.card import MDCard
-from kivymd.uix.dialog import MDDialog
-from kivymd.uix.selectioncontrol import MDCheckbox
+from kivy.uix.screenmanager import Screen
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.button import Button
+from kivy.uix.label import Label
+from kivy.uix.textinput import TextInput
+from kivy.uix.scrollview import ScrollView
+from kivy.uix.popup import Popup
 from kivy.metrics import dp
+from core.storage import get_all_printers, save_printer, delete_printer_by_id
 
-from core.storage import add_printer, get_printers, delete_printer
 
-
-class PrinterScreen(MDScreen):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._build_ui()
+class PrinterScreen(Screen):
+    def on_enter(self):
+        if not hasattr(self, 'list_layout'):
+            self._build_ui()
+        self._refresh()
 
     def _build_ui(self):
-        layout = MDBoxLayout(orientation="vertical", spacing=dp(10), padding=dp(15))
+        from kivy.metrics import dp
+        root = BoxLayout(orientation='vertical', padding=dp(12), spacing=dp(8))
 
-        # 顶部
-        top = MDBoxLayout(size_hint_y=None, height=dp(48))
-        top.add_widget(MDFlatButton(
-            text="< 返回",
-            on_release=lambda x: setattr(self.manager, "current", "home"),
-        ))
-        top.add_widget(MDLabel(text="打印机管理", halign="center", font_style="H6"))
-        top.add_widget(MDLabel(size_hint_x=0.2))
-        layout.add_widget(top)
-
-        # 打印机列表
-        scroll = MDScrollView()
-        self.printer_box = MDBoxLayout(
-            orientation="vertical",
-            adaptive_height=True,
-            spacing=dp(8),
-        )
-        scroll.add_widget(self.printer_box)
-        layout.add_widget(scroll)
-
-        # 添加打印机
-        layout.add_widget(MDLabel(
-            text="添加打印机",
-            font_style="Subtitle1",
-            size_hint_y=None,
-            height=dp(30),
+        root.add_widget(Label(
+            text='[b]打印机设置[/b]', markup=True, halign='center',
+            size_hint_y=None, height=dp(44), font_size=dp(18)
         ))
 
-        self.sn_field = MDTextField(hint_text="打印机 SN", mode="rectangle")
-        self.key_field = MDTextField(hint_text="打印机 Key（可选）", mode="rectangle")
-        self.name_field = MDTextField(hint_text="备注名称（可选）", mode="rectangle")
-        layout.add_widget(self.sn_field)
-        layout.add_widget(self.key_field)
-        layout.add_widget(self.name_field)
+        self.list_container = ScrollView(size_hint_y=1)
+        self.list_layout = BoxLayout(orientation='vertical', size_hint_y=None, spacing=dp(8), padding=dp(4))
+        self.list_layout.bind(minimum_height=self.list_layout.setter('height'))
+        self.list_container.add_widget(self.list_layout)
+        root.add_widget(self.list_container)
 
-        purpose_box = MDBoxLayout(size_hint_y=None, height=dp(40), spacing=dp(20))
-        self.purpose_var = "receipt"
-        self.receipt_radio = MDCheckbox(active=True, group="purpose", size_hint_x=None, width=dp(30))
-        self.cup_radio = MDCheckbox(group="purpose", size_hint_x=None, width=dp(30))
-        purpose_box.add_widget(self.receipt_radio)
-        purpose_box.add_widget(MDLabel(text="收银小票", size_hint_x=0.3))
-        purpose_box.add_widget(self.cup_radio)
-        purpose_box.add_widget(MDLabel(text="杯贴", size_hint_x=0.3))
-        layout.add_widget(purpose_box)
-
-        self.default_check = MDCheckbox(active=True, size_hint_x=None, width=dp(30))
-        default_box = MDBoxLayout(size_hint_y=None, height=dp(40))
-        default_box.add_widget(self.default_check)
-        default_box.add_widget(MDLabel(text="设为默认打印机"))
-        layout.add_widget(default_box)
-
-        layout.add_widget(MDRaisedButton(
-            text="添加打印机",
-            size_hint_x=1,
-            on_release=lambda x: self._add_printer(),
+        bottom = BoxLayout(size_hint_y=None, height=dp(46), spacing=dp(8))
+        bottom.add_widget(Button(
+            text='← 返回', background_color=(0.4, 0.4, 0.4, 1),
+            on_release=lambda x: setattr(self.manager, 'current', 'home')
         ))
+        bottom.add_widget(Button(
+            text='＋ 添加打印机', background_color=(0.2, 0.6, 0.8, 1),
+            on_release=lambda x: self._show_add_popup()
+        ))
+        root.add_widget(bottom)
 
-        self.add_widget(layout)
+        self.add_widget(root)
 
-    def on_enter(self):
-        self._refresh_list()
-
-    def _refresh_list(self):
-        self.printer_box.clear_widgets()
-        printers = get_printers()
+    def _refresh(self):
+        if not hasattr(self, 'list_layout'):
+            return
+        self.list_layout.clear_widgets()
+        printers = get_all_printers()
         if not printers:
-            self.printer_box.add_widget(MDLabel(
-                text="暂无打印机，请添加",
-                halign="center",
-                theme_text_color="Hint",
-                size_hint_y=None,
-                height=dp(50),
+            self.list_layout.add_widget(Label(
+                text='暂无打印机，请点击添加', color=(0.5, 0.5, 0.5, 1), size_hint_y=None, height=dp(60)
             ))
             return
-
         for p in printers:
-            card = MDCard(padding=dp(10), size_hint_y=None, height=dp(80), elevation=1)
-            row = MDBoxLayout()
-            info = MDBoxLayout(orientation="vertical")
-            purpose_text = "收银小票" if p["purpose"] == "receipt" else "杯贴"
-            default_text = " [默认]" if p["is_default"] else ""
-            info.add_widget(MDLabel(
-                text=f"{p['name'] or p['sn']}{default_text}",
-                font_style="Subtitle1",
+            ptype = p.get('purpose', 'receipt')
+            row = BoxLayout(size_hint_y=None, height=dp(60), padding=dp(8))
+            info = BoxLayout(orientation='vertical', size_hint_x=0.6)
+            info.add_widget(Label(
+                text=f"[b]{'收银小票' if ptype == 'receipt' else '杯贴'}[/b] {p.get('name','')}",
+                markup=True, halign='left', font_size=dp(14)
             ))
-            info.add_widget(MDLabel(
-                text=f"SN: {p['sn']}  |  {purpose_text}",
-                theme_text_color="Secondary",
-                font_style="Caption",
+            info.add_widget(Label(
+                text=f"SN: {p.get('sn','')[:12]}...", color=(0.4, 0.4, 0.4, 1),
+                halign='left', font_size=dp(11)
+            ))
+            info.add_widget(Label(
+                text='\u2714 默认' if p.get('is_default') else '', color=(0, 0.7, 0, 1),
+                font_size=dp(11)
             ))
             row.add_widget(info)
-            row.add_widget(MDFlatButton(
-                text="删除",
-                on_release=lambda x, sn=p["sn"]: self._delete(sn),
+            btns = BoxLayout(size_hint_x=0.4, spacing=dp(4))
+            btns.add_widget(Button(
+                text='默认', size_hint_x=0.5,
+                background_color=(0, 0.6, 0.2, 1) if not p.get('is_default') else (0.3, 0.3, 0.3, 1),
+                on_release=lambda x, pid=p['id']: self._set_default(pid)
             ))
-            card.add_widget(row)
-            self.printer_box.add_widget(card)
+            btns.add_widget(Button(
+                text='删除', size_hint_x=0.5,
+                background_color=(0.9, 0.2, 0.2, 1),
+                on_release=lambda x, pid=p['id']: self._delete(pid)
+            ))
+            row.add_widget(btns)
+            self.list_layout.add_widget(row)
 
-    def _add_printer(self):
-        sn = self.sn_field.text.strip()
+    def _show_add_popup(self):
+        from kivy.metrics import dp
+        content = BoxLayout(orientation='vertical', padding=dp(16), spacing=dp(12))
+
+        ptype_label = Label(text='类型:', size_hint_x=0.3)
+        self.ptype_dropdown = TextInput(text='receipt', hint_text='receipt / cup', size_hint_x=0.7)
+        content.add_widget(ptype_label)
+        content.add_widget(self.ptype_dropdown)
+
+        self.name_input = TextInput(hint_text='打印机名称', multiline=False, size_hint_y=None, height=dp(40))
+        self.sn_input = TextInput(hint_text='打印机 SN', multiline=False, size_hint_y=None, height=dp(40))
+        self.key_input = TextInput(hint_text='Printer Key (可选)', multiline=False, size_hint_y=None, height=dp(40))
+
+        content.add_widget(Label(text='名称:', size_hint_y=None, height=dp(25)))
+        content.add_widget(self.name_input)
+        content.add_widget(Label(text='SN:', size_hint_y=None, height=dp(25)))
+        content.add_widget(self.sn_input)
+        content.add_widget(Label(text='Key:', size_hint_y=None, height=dp(25)))
+        content.add_widget(self.key_input)
+
+        btn_row = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(8))
+        btn_row.add_widget(Button(text='取消', on_release=lambda x, p=popup: p.dismiss()))
+        save_btn = Button(text='保存', background_color=(0.2, 0.6, 0.8, 1),
+                          on_release=lambda x, p=popup: self._save_printer(p))
+        btn_row.add_widget(save_btn)
+        content.add_widget(btn_row)
+
+        popup = Popup(title='添加打印机', content=content, size_hint=(0.9, 0.8), auto_dismiss=False)
+        popup.open()
+
+    def _save_printer(self, popup):
+        name = self.name_input.text.strip()
+        sn = self.sn_input.text.strip()
+        ptype = self.ptype_dropdown.text.strip() or 'receipt'
+        key = self.key_input.text.strip()
         if not sn:
             return
-        purpose = "receipt" if self.receipt_radio.active else "cup"
-        add_printer(
-            sn=sn,
-            key=self.key_field.text.strip(),
-            name=self.name_field.text.strip(),
-            purpose=purpose,
-            is_default=self.default_check.active,
-        )
-        self.sn_field.text = ""
-        self.key_field.text = ""
-        self.name_field.text = ""
-        self._refresh_list()
+        save_printer({'name': name, 'sn': sn, 'key': key, 'type': ptype})
+        popup.dismiss()
+        self._refresh()
 
-    def _delete(self, sn):
-        delete_printer(sn)
-        self._refresh_list()
+    def _set_default(self, pid):
+        printers = get_all_printers()
+        for p in printers:
+            save_printer({**p, 'is_default': (p['id'] == pid)})
+        self._refresh()
+
+    def _delete(self, pid):
+        delete_printer_by_id(pid)
+        self._refresh()
