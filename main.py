@@ -9,16 +9,9 @@ import kivy
 kivy.require('2.1.0')
 from kivy.config import Config
 Config.set('kivy', 'copy_kivy_files', '0')
-Config.set('kivy', 'default_font', ['NotoSansSC',
-    'fonts/NotoSansSC-Regular.ttf',
-    'fonts/NotoSansSC-Regular.ttf',
-    'fonts/NotoSansSC-Regular.ttf',
-    'fonts/NotoSansSC-Regular.ttf'])
 
 from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager
-from kivy.core.text import LabelBase
-from kivy.resources import resource_find
 
 from core.storage import init_db
 from screens.home import HomeScreen
@@ -39,14 +32,6 @@ def log(msg):
 class OrderPrinterApp(App):
     def build(self):
         log("build() 开始")
-
-        # 注册中文字体
-        font_path = resource_find("fonts/NotoSansSC-Regular.ttf")
-        if font_path:
-            LabelBase.register(name="NotoSansSC", fn_regular=font_path)
-            log(f"中文字体已注册: {font_path}")
-        else:
-            log("警告: 未找到中文字体")
 
         try:
             log("init_db() 开始")
